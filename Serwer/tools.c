@@ -26,6 +26,13 @@ void print_error(const char *msg) {
     exit(-1);
 }
 
+void handler(int sig, siginfo_t *si, void *data) {
+    ring_flag = 0;
+    kill(reg[0].pid, SIGRTMIN + 13);
+    kill(reg[1].pid, SIGRTMIN + 13);
+    kill(arbiter_pid,SIGRTMIN+13);
+}
+
 void setup() {
     srand(time(NULL));
     load_environment_variables();
@@ -43,6 +50,13 @@ void setup() {
     create_timer(ring_reg, SIGRTMIN + 1, registration_handler);
 
     create_arbiter();
+
+    struct sigaction sa;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = handler;
+    if (sigaction(SIGRTMIN + 13, &sa, NULL) == -1)
+        print_error("SIGRTMIN+13 sigaction error");
 
     fi_fd = -1;
     feeder_flag = 0;
@@ -92,11 +106,27 @@ void feeder() {
 
 void ring_registration() {
     if (fi_fd == -1) {
-        fi_fd = open(fi_path,O_RDONLY|O_NDELAY|O_NONBLOCK);
-        if(fi_fd == -1)
+        fi_fd = open(fi_path, O_RDONLY | O_NDELAY | O_NONBLOCK);
+        if (fi_fd == -1)
             print_error("fi open error");
     } else {
-        //TODO try to read structures
+        if (!ring_flag) {
+            if (read(fi_fd, reg, 2 * sizeof(struct registration_info)) == 2 * sizeof(struct registration_info) && reg[0].pid != reg[1].pid) {
+                ring_flag = 1;
+                union sigval sv;
+                sv.sival_int = reg[1].chld_pgid;
+                sigqueue(reg[0].pid, SIGRTMIN + 13, sv);
+                sv.sival_int = reg[0].chld_pgid;
+                sigqueue(reg[1].pid, SIGRTMIN + 13, sv);
+                struct timespec ts;
+                ts.tv_sec = 0;
+                ts.tv_nsec = 10;
+                nanosleep(&ts,NULL);
+                kill(arbiter_pid, SIGRTMIN + 13);
+            }
+        }
+        char buff[255];
+        while (read(fi_fd, buff, 255) == 255);
         close(fi_fd);
         fi_fd = -1;
     }
@@ -110,7 +140,7 @@ void create_arbiter() {
             print_error("fork error");
             break;
         case 0:
-            if (execl("./Arbiter", "Arbiter", NULL))
+            if (execl("Arbiter", "Arbiter", NULL))
                 print_error("execl error");
         default:
             break;

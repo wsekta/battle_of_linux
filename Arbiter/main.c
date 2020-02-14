@@ -39,7 +39,7 @@ int main() {
     while (1) {
         if (active_flag) {
             totem_fd = open(totem_path, O_RDONLY | O_NDELAY);
-            if (totem_fd)
+            if (totem_fd == -1)
                 print_error("open fifo error");
             struct timespec time = ftots(totem_op);
             nanosleep(&time, NULL);
@@ -87,6 +87,7 @@ void setup() {
         print_error("sigaction error");
 
     active_flag = 0;
+    totem_fd=0;
 }
 
 struct timespec ftots(double time) {

@@ -8,4 +8,4 @@ add_subdirectory(Arbiter)
 
 add_subdirectory(Klient)
 
-add_executable(Hooligan hooligan.c)
+add_subdirectory(Hooligan)

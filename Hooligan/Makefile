@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Wall -Werror
 DEPS=
 
-all: Arbiter #final
+all: Hooligan #final
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -10,5 +10,5 @@ all: Arbiter #final
 final:
 	rm -f *.o
 
-Arbiter: main.o
-	$(CC) -o Arbiter main.o
+Hooligan: main.o
+	$(CC) -o Hooligan main.o

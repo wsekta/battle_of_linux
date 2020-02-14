@@ -11,7 +11,7 @@ os.environ["RING_REG"] = "1"
 os.environ["TOTEM_OP"] = "1"
 os.environ["TOTEM_CL"] = "1"
 
-os.system("./Klient &")
+#os.system("./Klient &")
 
 os.system("./Serwer &")
 

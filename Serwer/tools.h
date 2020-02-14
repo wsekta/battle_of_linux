@@ -5,6 +5,11 @@
 #ifndef BATTLE_OF_LINUX_TOOL_H
 #define BATTLE_OF_LINUX_TOOL_H
 
+struct registration_info{
+    int pid;
+    int chld_pgid;
+} reg[2];
+
 char fi_path[255];
 char fo_path[255];
 
