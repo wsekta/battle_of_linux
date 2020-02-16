@@ -8,6 +8,7 @@
 #include <signal.h>
 
 struct timespec ftots(double time) {
+    time /= 100;
     struct timespec res = {(int) time, (time - (int) time) * 1000000000l};
     return res;
 }

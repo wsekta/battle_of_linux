@@ -14,5 +14,7 @@ int main(int argc, char *argv[]) {
             feeder();
         if (reg_flag && !ring_flag)
             ring_registration();
+        if (!is_fighting[0] && !is_fighting[1] && ring_flag)
+            end_of_war();
     }
 }

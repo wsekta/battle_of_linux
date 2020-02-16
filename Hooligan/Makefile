@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Wall -Werror
 DEPS=
 
-all: Hooligan #final
+all: Hooligan final
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

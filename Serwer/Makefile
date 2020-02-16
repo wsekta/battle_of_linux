@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Wall -Werror -I -lrt.
 DEPS=tools.h timers.h
 
-all: Serwer #final
+all: Serwer final
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

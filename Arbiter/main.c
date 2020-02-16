@@ -42,15 +42,21 @@ int main() {
             if (totem_fd == -1)
                 print_error("open fifo error");
             struct timespec time = ftots(totem_op);
+          //printf("totem otwarty\n");
             nanosleep(&time, NULL);
+
+            if (!active_flag)
+                continue;
 
             if (close(totem_fd))
                 print_error("close fifo error");
             time = ftots(totem_cl);
+          //printf("totem zamkniety\n");
             nanosleep(&time, NULL);
         } else {
             if (fcntl(totem_fd, F_GETFD) != -1 || errno != EBADF)
                 close(totem_fd);
+          //printf("wakacje\n");
             pause();
         }
     }
@@ -87,10 +93,11 @@ void setup() {
         print_error("sigaction error");
 
     active_flag = 0;
-    totem_fd=0;
+    totem_fd = 0;
 }
 
 struct timespec ftots(double time) {
+    time /= 100;
     struct timespec res = {(int) time, (time - (int) time) * 1000000000l};
     return res;
 }

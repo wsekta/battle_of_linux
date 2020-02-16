@@ -10,6 +10,8 @@ struct registration_info{
     int chld_pgid;
 } reg[2];
 
+int is_fighting[2];
+
 char fi_path[255];
 char fo_path[255];
 
@@ -28,5 +30,7 @@ void setup();
 void feeder();
 
 void ring_registration();
+
+void end_of_war();
 
 #endif //BATTLE_OF_LINUX_TOOL_H

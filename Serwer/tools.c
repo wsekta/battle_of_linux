@@ -27,10 +27,10 @@ void print_error(const char *msg) {
 }
 
 void handler(int sig, siginfo_t *si, void *data) {
-    ring_flag = 0;
-    kill(reg[0].pid, SIGRTMIN + 13);
-    kill(reg[1].pid, SIGRTMIN + 13);
-    kill(arbiter_pid,SIGRTMIN+13);
+    if(si->si_pid == reg[0].pid)
+        is_fighting[0]=0;
+    else
+        is_fighting[1]=0;
 }
 
 void setup() {
@@ -52,7 +52,7 @@ void setup() {
     create_arbiter();
 
     struct sigaction sa;
-    sa.sa_flags = SA_SIGINFO;
+    sa.sa_flags = SA_SIGINFO | SA_NODEFER;
     sigemptyset(&sa.sa_mask);
     sa.sa_sigaction = handler;
     if (sigaction(SIGRTMIN + 13, &sa, NULL) == -1)
@@ -97,6 +97,7 @@ void feeder() {
             print_error("open FO fifo");
     } else {
         int i = rand() % (recruit_max + 1);
+       //printf("karmimy %d hooliganow\n",i);
         while (i--)
             write(fifo_fd, "y", 1);
     }
@@ -111,16 +112,20 @@ void ring_registration() {
             print_error("fi open error");
     } else {
         if (!ring_flag) {
-            if (read(fi_fd, reg, 2 * sizeof(struct registration_info)) == 2 * sizeof(struct registration_info) && reg[0].pid != reg[1].pid) {
+            if ((read(fi_fd, reg, 2 * sizeof(struct registration_info)) == 2 * sizeof(struct registration_info)) && reg[0].pid != reg[1].pid
+                    && reg[0].chld_pgid != 0 && reg[0].chld_pgid != 1 && reg[1].chld_pgid != 0 && reg[1].chld_pgid != 1) {
                 ring_flag = 1;
+                is_fighting[0]=1;
+                is_fighting[1]=1;
                 union sigval sv;
+              //printf("wojna między %d(dzieci %d) a %d(dzieci %d)\n",reg[0].pid,reg[0].chld_pgid,reg[1].pid,reg[1].chld_pgid);
                 sv.sival_int = reg[1].chld_pgid;
                 sigqueue(reg[0].pid, SIGRTMIN + 13, sv);
                 sv.sival_int = reg[0].chld_pgid;
                 sigqueue(reg[1].pid, SIGRTMIN + 13, sv);
                 struct timespec ts;
                 ts.tv_sec = 0;
-                ts.tv_nsec = 10;
+                ts.tv_nsec = 10000000l;
                 nanosleep(&ts,NULL);
                 kill(arbiter_pid, SIGRTMIN + 13);
             }
@@ -150,4 +155,13 @@ void create_arbiter() {
 void do_at_end() {
     unlink(fi_path);
     unlink(fo_path);
+}
+void end_of_war(){
+    kill(arbiter_pid,SIGRTMIN+13);
+  //printf("koniec wojny\n");
+    ring_flag = 0;
+    fi_fd = open(fi_path, O_RDONLY | O_NDELAY | O_NONBLOCK);
+    char buff[255];
+    while (read(fi_fd, buff, 255) == 255);
+    close(fi_fd);
 }

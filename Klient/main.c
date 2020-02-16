@@ -18,6 +18,7 @@ struct registration_info {
 
 int ring_flag;
 int successful_registration_flag;
+int win_flag;
 int fo_fd;
 int child_no;
 int chld_pgid;
@@ -44,28 +45,39 @@ void child_main();
 
 void try_to_register();
 
+void do_at_win();
+
 int main() {
     setup();
     while (1) {
         if (!ring_flag) {
             char c[1];
             if (!successful_registration_flag && child_no < 255)
-                if (read(fo_fd, c, 1)) {
+                if (read(fo_fd, c, 1) == 1) {
                     make_child();
                 }
             if (child_no >= 3)
                 try_to_register();
-            successful_registration_flag = 0;
+        } else {
+            if (win_flag >= child_no)
+                do_at_win();
         }
+        successful_registration_flag = 0;
         siginfo_t si;
         if (child_no) {
             do {
                 waitid(P_ALL, 0, &si, WNOHANG | WEXITED);
                 if (si.si_pid) {
+                    win_flag = 0;
                     if (!(--child_no)) {
                         union sigval sv;
                         sv.sival_int = 0;
-                        sigqueue(server_pid, SIGRTMIN + 13, sv);
+                        if(ring_flag) {
+                          //printf("przegranko %d\n",getpid());
+                            sigqueue(server_pid, SIGRTMIN + 13, sv);
+                            ring_flag = 0;
+                            chld_pgid = 0;
+                        }
                     }
                 }
             } while (si.si_pid);
@@ -75,29 +87,16 @@ int main() {
 }
 
 void parent_handler(int sig, siginfo_t *si, void *data) {
-    if (!ring_flag) {
+    if (chld_pgid != getpgid(si->si_pid)) {
+        win_flag = 0;
+      //printf("%d idzie na wojne z %d mając %d potomkow\n", getpid(), si->si_value.sival_int,child_no);
         for (int i = 0; i < child_no; ++i)
-            sigqueue(children_pids[i], SIGRTMIN + 13, si->si_value);//doesn't work, don't know why
+            sigqueue(children_pids[i], SIGRTMIN + 13, si->si_value);
         ring_flag = 1;
         server_pid = si->si_pid;
-    } else {
-        ring_flag = 0;
-        int child_no_cpy = child_no;
-        kill(-chld_pgid, SIGTERM);
-        chld_pgid = 0;
-        siginfo_t si;
-        do {
-            waitid(P_ALL, 0, &si, WNOHANG | WEXITED);
-            if (si.si_pid) {
-                if (!(--child_no)) {
-                    union sigval sv;
-                    sv.sival_int = 0;
-                    sigqueue(server_pid, SIGRTMIN + 13, sv);
-                }
-            }
-        } while (si.si_pid);
-        for (int i = 0; i < child_no_cpy; ++i)
-            make_child();
+    }
+    if (chld_pgid == getpgid(si->si_pid)){
+        win_flag++;
     }
 }
 
@@ -142,8 +141,10 @@ void make_child() {
     switch (child_pid) {
         case -1:
             print_error("fork_error");
+            break;
         case 0:
             child_main();
+            break;
         default:
             setpgid(child_pid, chld_pgid);
             chld_pgid = getpgid(child_pid);
@@ -153,8 +154,8 @@ void make_child() {
 }
 
 void try_to_register() {
-    int fi_fd = open(fi_path, O_WRONLY | O_NDELAY | O_NONBLOCK);
-    if (fi_fd == -1 && errno != ENXIO)
+    int fi_fd = open(fi_path, O_WRONLY);
+    if (fi_fd == -1 && errno != ENXIO && errno !=EINTR)
         print_error("fi open error");
     else if (fi_fd == -1 && errno == ENXIO)
         return;
@@ -179,4 +180,29 @@ void child_main() {
         print_error("SIGRTMIN+13 sigaction error");
     while (1)
         pause();
+}
+
+void do_at_win()
+{
+  //printf("wygrywa: %d\n", getpid());
+    ring_flag = 0;
+    int child_no_cpy = child_no;
+    kill(-chld_pgid, SIGTERM);
+    chld_pgid = 0;
+    siginfo_t si;
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 1000000;
+    nanosleep(&ts, NULL);
+    do {
+        waitid(P_ALL, 0, &si, WNOHANG | WEXITED);
+        if (si.si_pid) {
+            --child_no;
+        }
+    } while (si.si_pid);
+    for (int i = 0; i < child_no_cpy; ++i)
+        make_child();
+    union sigval sv;
+    sv.sival_int = 1;
+    sigqueue(server_pid, SIGRTMIN + 13, sv);
 }

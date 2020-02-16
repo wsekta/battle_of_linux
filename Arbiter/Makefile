@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Wall -Werror
 DEPS=
 
-all: Arbiter #final
+all: Arbiter final
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

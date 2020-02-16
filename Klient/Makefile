@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Wall -Werror -I -lrt.
 DEPS=
 
-all: Klient #final
+all: Klient final
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

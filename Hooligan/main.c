@@ -35,7 +35,15 @@ void chld_handler(int sig, siginfo_t *si, void *data);
 
 
 int main(int argc, char *argv[]) {
-    srand(time(NULL));
+    struct sigaction sa;
+    sa.sa_flags = SA_SIGINFO | SA_NODEFER ;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = chld_handler;
+    if (sigaction(SIGBUS, &sa, NULL) == -1)
+        print_error("SIGBUS sigaction error");
+    if (sigaction(SIGALRM, &sa, NULL) == -1)
+        print_error("SIGALRM sigaction error");
+    srand(time(NULL) + getpid());
     if (argc != 2)
         print_error("too few arguments");
     char *p;
@@ -50,20 +58,11 @@ int main(int argc, char *argv[]) {
     strcat(totem_path, "Totem");
 
     wait_time.tv_sec = 0;
-    wait_time.tv_nsec = 1000000l;
+    wait_time.tv_nsec = 100l;
 
     was_opened_flag = 0;
     prepared_flag = 0;
     attacked_flag = 0;
-
-    struct sigaction sa;
-    sa.sa_flags = SA_SIGINFO;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_sigaction = chld_handler;
-    if (sigaction(SIGBUS, &sa, NULL) == -1)
-        print_error("SIGBUS sigaction error");
-    if (sigaction(SIGALRM, &sa, NULL) == -1)
-        print_error("SIGALRM sigaction error");
 
     int totem_fd;
     while (1) {
@@ -81,7 +80,10 @@ int main(int argc, char *argv[]) {
 }
 
 void prepare() {
-    kill(-enemy_pgid, SIGALRM);
+    target_pid = 0;
+    prepared_flag = 1;
+    was_opened_flag = 1;
+    attacked_flag = 0;
     if (rand() % 2) {
         signal(SIGUSR1, SIG_DFL);
         signal(SIGUSR2, SIG_IGN);
@@ -89,16 +91,18 @@ void prepare() {
         signal(SIGUSR1, SIG_IGN);
         signal(SIGUSR2, SIG_DFL);
     }
-    prepared_flag = 1;
-    was_opened_flag = 1;
-    attacked_flag = 0;
+    kill(-enemy_pgid, SIGALRM);
 }
 
 void attack() {
-    if (rand() % 2)
-        kill(target_pid, SIGUSR1);
-    else
-        kill(target_pid, SIGUSR2);
+    if (target_pid) {
+        if (rand() % 2)
+            kill(target_pid, SIGUSR1);
+        else
+            kill(target_pid, SIGUSR2);
+    } else {
+        kill(getppid(), SIGRTMIN + 13);
+    }
     attacked_flag = 1;
     prepared_flag = 0;
 }
@@ -106,6 +110,6 @@ void attack() {
 void chld_handler(int sig, siginfo_t *si, void *data) {
     if (sig == SIGALRM)
         kill(si->si_pid, SIGBUS);
-    else if(sig == SIGBUS)
+    else if (sig == SIGBUS || target_pid == 0)
         target_pid = si->si_pid;
 }
