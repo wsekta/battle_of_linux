@@ -120,14 +120,17 @@ void ring_registration() {
                 union sigval sv;
               //printf("wojna między %d(dzieci %d) a %d(dzieci %d)\n",reg[0].pid,reg[0].chld_pgid,reg[1].pid,reg[1].chld_pgid);
                 sv.sival_int = reg[1].chld_pgid;
-                sigqueue(reg[0].pid, SIGRTMIN + 13, sv);
+                if(sigqueue(reg[0].pid, SIGRTMIN + 13, sv))
+                    print_error("sigqueue");
                 sv.sival_int = reg[0].chld_pgid;
-                sigqueue(reg[1].pid, SIGRTMIN + 13, sv);
+                if(sigqueue(reg[1].pid, SIGRTMIN + 13, sv))
+                    print_error("sigqueue");
                 struct timespec ts;
                 ts.tv_sec = 0;
-                ts.tv_nsec = 10000000l;
+                ts.tv_nsec = 1000000l;
                 nanosleep(&ts,NULL);
-                kill(arbiter_pid, SIGRTMIN + 13);
+                if(kill(arbiter_pid, SIGRTMIN + 13))
+                    print_error("sigqueue");
             }
         }
         char buff[255];
@@ -153,15 +156,20 @@ void create_arbiter() {
 }
 
 void do_at_end() {
+    //probably never do
     unlink(fi_path);
     unlink(fo_path);
 }
 void end_of_war(){
-    kill(arbiter_pid,SIGRTMIN+13);
+    if(kill(arbiter_pid,SIGRTMIN+13))
+        print_error("stop arbiter");
   //printf("koniec wojny\n");
     ring_flag = 0;
     fi_fd = open(fi_path, O_RDONLY | O_NDELAY | O_NONBLOCK);
+    if (fi_fd == -1)
+        print_error("fi open error");
     char buff[255];
     while (read(fi_fd, buff, 255) == 255);
-    close(fi_fd);
+    if(close(fi_fd))
+        print_error("close fi");
 }

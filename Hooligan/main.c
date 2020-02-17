@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     strcat(totem_path, "Totem");
 
     wait_time.tv_sec = 0;
-    wait_time.tv_nsec = 100l;
+    wait_time.tv_nsec = 100000l;
 
     was_opened_flag = 0;
     prepared_flag = 0;
@@ -72,7 +72,8 @@ int main(int argc, char *argv[]) {
         else if (totem_fd != -1) {
             if (!prepared_flag)
                 prepare();
-            close(totem_fd);
+            if(close(totem_fd))
+                print_error("hooligan's close");
         } else if (!attacked_flag && was_opened_flag)
             attack();
         nanosleep(&wait_time, NULL);
@@ -81,17 +82,24 @@ int main(int argc, char *argv[]) {
 
 void prepare() {
     target_pid = 0;
+    if(kill(-enemy_pgid, SIGALRM) && errno == ESRCH){
+        //printf("win %d\n",getpid());
+        kill(getppid(), SIGRTMIN + 13);
+    }
+    if (rand() % 2) {
+        if(signal(SIGUSR1, SIG_DFL)==SIG_ERR)
+            print_error("signal");
+        if(signal(SIGUSR2, SIG_IGN)==SIG_ERR)
+            print_error("signal");
+    } else {
+        if(signal(SIGUSR2, SIG_DFL)==SIG_ERR)
+            print_error("signal");
+        if(signal(SIGUSR1, SIG_IGN)==SIG_ERR)
+            print_error("signal");
+    }
     prepared_flag = 1;
     was_opened_flag = 1;
     attacked_flag = 0;
-    if (rand() % 2) {
-        signal(SIGUSR1, SIG_DFL);
-        signal(SIGUSR2, SIG_IGN);
-    } else {
-        signal(SIGUSR1, SIG_IGN);
-        signal(SIGUSR2, SIG_DFL);
-    }
-    kill(-enemy_pgid, SIGALRM);
 }
 
 void attack() {
@@ -101,7 +109,7 @@ void attack() {
         else
             kill(target_pid, SIGUSR2);
     } else {
-        kill(getppid(), SIGRTMIN + 13);
+
     }
     attacked_flag = 1;
     prepared_flag = 0;
@@ -110,6 +118,6 @@ void attack() {
 void chld_handler(int sig, siginfo_t *si, void *data) {
     if (sig == SIGALRM)
         kill(si->si_pid, SIGBUS);
-    else if (sig == SIGBUS || target_pid == 0)
+    else if (sig == SIGBUS)
         target_pid = si->si_pid;
 }

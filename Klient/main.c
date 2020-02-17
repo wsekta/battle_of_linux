@@ -73,7 +73,7 @@ int main() {
                         union sigval sv;
                         sv.sival_int = 0;
                         if(ring_flag) {
-                          //printf("przegranko %d\n",getpid());
+                            //printf("przegranko %d\n",getpid());
                             sigqueue(server_pid, SIGRTMIN + 13, sv);
                             ring_flag = 0;
                             chld_pgid = 0;
@@ -109,7 +109,7 @@ void setup() {
     char *camp = getenv("CAMP");
     if (!camp)
         print_error("environment variable(s) not defined");
-    wait_time.tv_nsec = 10;
+    wait_time.tv_nsec = 1000000l;
     wait_time.tv_sec = 0;
 
     strcat(fi_path, camp);
@@ -154,7 +154,7 @@ void make_child() {
 }
 
 void try_to_register() {
-    int fi_fd = open(fi_path, O_WRONLY);
+    int fi_fd = open(fi_path, O_WRONLY | O_NONBLOCK | O_NDELAY);
     if (fi_fd == -1 && errno != ENXIO && errno !=EINTR)
         print_error("fi open error");
     else if (fi_fd == -1 && errno == ENXIO)
@@ -162,13 +162,15 @@ void try_to_register() {
     reg_info.chld_pgid = chld_pgid;
     write(fi_fd, &reg_info, sizeof(reg_info));
     successful_registration_flag = 1;
-    close(fi_fd);
+    if(close(fi_fd))
+        print_error("fi close error");
 }
 
 void chld_handler(int sig, siginfo_t *si, void *data) {
     char str[10];
     sprintf(str, "%d", si->si_value.sival_int);
-    execl("Hooligan", "Hooligan", str, NULL);
+    if(execl("Hooligan", "Hooligan", str, NULL))
+        print_error("execl");
 }
 
 void child_main() {
@@ -184,15 +186,16 @@ void child_main() {
 
 void do_at_win()
 {
-  //printf("wygrywa: %d\n", getpid());
+    //printf("wygrywa: %d\n", getpid());
     ring_flag = 0;
     int child_no_cpy = child_no;
-    kill(-chld_pgid, SIGTERM);
+    if(kill(-chld_pgid, SIGTERM))
+        print_error("kill");
     chld_pgid = 0;
     siginfo_t si;
     struct timespec ts;
     ts.tv_sec = 0;
-    ts.tv_nsec = 1000000;
+    ts.tv_nsec = 1000000l;
     nanosleep(&ts, NULL);
     do {
         waitid(P_ALL, 0, &si, WNOHANG | WEXITED);
@@ -204,5 +207,6 @@ void do_at_win()
         make_child();
     union sigval sv;
     sv.sival_int = 1;
-    sigqueue(server_pid, SIGRTMIN + 13, sv);
+    if(sigqueue(server_pid, SIGRTMIN + 13, sv))
+        print_error("sigqueue");
 }
